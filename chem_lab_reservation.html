@@ -1,0 +1,44 @@
+
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>化學實驗室線上預約系統</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body {
+      font-family: 'Noto Sans TC', sans-serif;
+      background-color: #f8fafc;
+    }
+    .toast {
+      visibility: hidden;
+      opacity: 0;
+      transition: opacity 0.5s, visibility 0.5s;
+    }
+    .toast.show {
+      visibility: visible;
+      opacity: 1;
+    }
+  </style>
+</head>
+<body class="p-4 md:p-8">
+  <div class="max-w-7xl mx-auto">
+    <h1 class="text-3xl font-bold text-center text-gray-800 mb-6">化學實驗室線上預約系統</h1>
+    <div class="bg-white p-6 rounded-xl shadow-lg">
+      <p class="text-gray-600 mb-4">請使用 Google Apps Script 作為後端。</p>
+      <!-- 表單區與行事曆會由 JavaScript 動態插入 -->
+    </div>
+  </div>
+  <div id="toast" class="toast fixed bottom-5 right-5 bg-gray-800 text-white py-3 px-6 rounded-lg shadow-xl">
+    <p id="toast-message"></p>
+  </div>
+  <script>
+    const GAS_URL = 'https://script.google.com/macros/s/你的網址/exec';
+    // 在這裡插入前端 JavaScript，如 fetchReservationsFromSheet、handleReservation 等邏輯
+    document.getElementById('toast-message').textContent = '預約系統載入完成';
+    document.getElementById('toast').classList.add('show');
+    setTimeout(() => document.getElementById('toast').classList.remove('show'), 3000);
+  </script>
+</body>
+</html>
