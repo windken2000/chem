@@ -123,144 +123,271 @@
     </div>
 
    
-        <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
     <script>
-    // 【修改 1/4】貼上你從 Firebase 取得的設定碼
-    const firebaseConfig = {
-  apiKey: "AIzaSyC7JdYNrCaEwJBAoHB3puOa0MjAKNUKTqc",
-  authDomain: "chembooking-750a1.firebaseapp.com",
-  databaseURL: "https://chembooking-750a1-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId: "chembooking-750a1",
-  storageBucket: "chembooking-750a1.firebasestorage.app",
-  messagingSenderId: "533784290914",
-  appId: "1:533784290914:web:fc3e8d77093d75fac4933b"
-    };
+        // 1. Firebase 設定
+        const firebaseConfig = {
+            apiKey: "AIzaSyC7JdYNrCaEwJBAoHB3puOa0MjAKNUKTqc",
+            authDomain: "chembooking-750a1.firebaseapp.com",
+            databaseURL: "https://chembooking-750a1-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "chembooking-750a1",
+            storageBucket: "chembooking-750a1.firebasestorage.app",
+            messagingSenderId: "533784290914",
+            appId: "1:533784290914:web:fc3e8d77093d75fac4933b"
+        };
 
-    // 初始化 Firebase
-    firebase.initializeApp(firebaseConfig);
-    const database = firebase.database(); // 取得 Realtime Database 的實體
+        // 2. 初始化 Firebase
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
 
-    document.addEventListener('DOMContentLoaded', function () {
-        // --- 資料定義 (這部分不變) ---
-        const LABS = ['A (亞佛加厥)', 'B (波以耳)', 'C (居禮)'];
-        const DAYS_OF_WEEK = ['星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
-        const PERIODS = [
-            '第 1 節 (08:10-09:00)', '第 2 節 (09:10-10:00)', '第 3 節 (10:10-11:00)', '第 4 節 (11:10-12:00)',
-            '第 5 節 (13:10-14:00)', '第 6 節 (14:10-15:00)', '第 7 節 (15:10-16:00)', '第 8 節 (16:10-17:00)'
-        ];
-        const TEACHERS = ['丁鋐鎰', '王雅俐', '王志仁', '林佳靜', '林嘉宏', '紀丞哲', '陳文典', '陳國鼎', '陳義忠', '鄭立村', '蘇育慧', '林宗翰'];
+        // 3. 等待網頁元素載入後，執行所有操作
+        document.addEventListener('DOMContentLoaded', function () {
 
-        // --- 狀態管理 ---
-        let reservations = {}; // 先建立一個空的本地端物件
-        LABS.forEach(lab => reservations[lab] = {}); // 初始化結構
-        let currentLab = LABS[0];
+            // --- 全域資料與常數 ---
+            const LABS = ['A (亞佛加厥)', 'B (波以耳)', 'C (居禮)'];
+            const DAYS_OF_WEEK = ['星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
+            const PERIODS = [
+                '第 1 節 (08:10-09:00)', '第 2 節 (09:10-10:00)', '第 3 節 (10:10-11:00)', '第 4 節 (11:10-12:00)',
+                '第 5 節 (13:10-14:00)', '第 6 節 (14:10-15:00)', '第 7 節 (15:10-16:00)', '第 8 節 (16:10-17:00)'
+            ];
+            const TEACHERS = ['丁鋐鎰', '王雅俐', '王志仁', '林佳靜', '林嘉宏', '紀丞哲', '陳文典', '陳國鼎', '陳義忠', '鄭立村', '蘇育慧', '林宗翰'];
 
-        // --- DOM 元素 (這部分不變) ---
-        const classSelect = document.getElementById('class-name');
-        const teacherSelect = document.getElementById('teacher-name');
-        // ... 其他 DOM 元素宣告 ...
-        const calendarContainer = document.getElementById('calendar-container');
+            // --- 狀態管理 ---
+            let reservations = {}; 
+            LABS.forEach(lab => reservations[lab] = {});
+            let currentLab = LABS[0];
 
-        // --- 函數 (有修改) ---
-        
-        // 【修改 2/4】監聽 Firebase 資料庫的變化
-        const reservationsRef = database.ref('reservations');
-        reservationsRef.on('value', (snapshot) => {
-            const data = snapshot.val();
-            if (data) {
-                reservations = data;
-                // 確保所有實驗室鍵都存在，避免舊資料庫沒有新實驗室
+            // --- 【重要】宣告所有會用到的網頁元素 ---
+            const classSelect = document.getElementById('class-name');
+            const teacherSelect = document.getElementById('teacher-name');
+            const labSelect = document.getElementById('lab-name');
+            const dateInput = document.getElementById('reservation-date');
+            const periodSelect = document.getElementById('period');
+            const bookBtn = document.getElementById('book-btn');
+            const cancelBtn = document.getElementById('cancel-btn');
+            const calendarContainer = document.getElementById('calendar-container');
+            const labTabsContainer = document.getElementById('lab-tabs');
+            const calendarTitle = document.getElementById('calendar-title');
+            const toast = document.getElementById('toast');
+            const toastMessage = document.getElementById('toast-message');
+
+            // --- 功能函數 (完整版) ---
+
+            function showToast(message, isError = false) {
+                toastMessage.textContent = message;
+                toast.className = `toast show fixed bottom-5 right-5 py-3 px-6 rounded-lg shadow-xl ${isError ? 'bg-red-600' : 'bg-gray-800'} text-white`;
+                setTimeout(() => {
+                    toast.className = toast.className.replace('show', '');
+                }, 3000);
+            }
+
+            function formatDate(date) {
+                return date.toISOString().split('T')[0];
+            }
+            
+            function getWeekDays(selectedDate) {
+                const date = new Date(selectedDate);
+                const day = date.getDay();
+                const diff = date.getDate() - day + (day === 0 ? -6 : 1);
+                const monday = new Date(date.setDate(diff));
+                
+                const week = [];
+                for (let i = 0; i < 6; i++) {
+                    const nextDay = new Date(monday);
+                    nextDay.setDate(monday.getDate() + i);
+                    week.push(nextDay);
+                }
+                return week;
+            }
+
+            function populateClasses() {
+                const classGroups = {
+                    '高中部': { prefix: '高', years: 3, count: 12 },
+                    '國中部': { prefix: '國', years: 3, count: 20 }
+                };
+                for (const groupName in classGroups) {
+                    const group = classGroups[groupName];
+                    const optgroup = document.createElement('optgroup');
+                    optgroup.label = groupName;
+                    for (let y = 1; y <= group.years; y++) {
+                        for (let c = 1; c <= group.count; c++) {
+                            const option = document.createElement('option');
+                            let yearInChinese = y === 1 ? '一' : y === 2 ? '二' : '三';
+                            let className = `${group.prefix}${yearInChinese}${c}班`;
+                            option.value = className;
+                            option.textContent = className;
+                            optgroup.appendChild(option);
+                        }
+                    }
+                    classSelect.appendChild(optgroup);
+                }
+                const advancedOptgroup = document.createElement('optgroup');
+                advancedOptgroup.label = '拔尖班';
+                const advancedGrades = ['國二', '國三'];
+                const advancedClassNames = ['1', '2', '3', 'A'];
+                advancedGrades.forEach(grade => {
+                    advancedClassNames.forEach(clsName => {
+                        const option = document.createElement('option');
+                        const fullClassName = `${grade}拔尖${clsName}班`;
+                        option.value = fullClassName;
+                        option.textContent = fullClassName;
+                        advancedOptgroup.appendChild(option);
+                    });
+                });
+                classSelect.appendChild(advancedOptgroup);
+            }
+
+            function populateTeachers() {
+                TEACHERS.forEach(teacher => {
+                    const option = document.createElement('option');
+                    option.value = teacher;
+                    option.textContent = teacher;
+                    teacherSelect.appendChild(option);
+                });
+            }
+
+            function renderCalendar() {
+                const weekDays = getWeekDays(dateInput.value || new Date());
+                const weekStart = weekDays[0];
+                const weekEnd = weekDays[5];
+                calendarTitle.textContent = `預約行事曆 (${formatDate(weekStart)} ~ ${formatDate(weekEnd)})`;
+                
+                let html = `<table class="min-w-full border-collapse border border-gray-200">`;
+                html += `<thead class="bg-gray-100"><tr class="text-center">`;
+                html += `<th class="p-3 border border-gray-200 font-semibold text-gray-600">節次</th>`;
+                weekDays.forEach((date, index) => {
+                    html += `<th class="p-3 border border-gray-200 font-semibold text-gray-600">
+                                <div>${DAYS_OF_WEEK[index]}</div>
+                                <div class="text-xs font-normal">${formatDate(date).substring(5)}</div>
+                             </th>`;
+                });
+                html += `</tr></thead>`;
+                html += `<tbody>`;
+                PERIODS.forEach((period) => {
+                    html += `<tr class="text-center">`;
+                    html += `<td class="p-3 border border-gray-200 font-medium text-sm text-gray-500">${period.split(' ')[0]}<br><span class="text-xs">${period.match(/\((.*)\)/)[1]}</span></td>`;
+                    weekDays.forEach((date) => {
+                        const key = `${formatDate(date)}-${period}`;
+                        const reservation = reservations[currentLab] ? reservations[currentLab][key] : null;
+                        if (reservation) {
+                            html += `<td class="p-3 border border-gray-200 calendar-cell booked text-sm">
+                                         <div class="font-bold">${reservation.class}</div>
+                                         <div class="text-xs mt-1">${reservation.teacher}</div>
+                                       </td>`;
+                        } else {
+                            html += `<td class="p-3 border border-gray-200 calendar-cell available text-sm">
+                                         <div>開放預約</div>
+                                       </td>`;
+                        }
+                    });
+                    html += `</tr>`;
+                });
+                html += `</tbody></table>`;
+                calendarContainer.innerHTML = html;
+            }
+
+            function renderTabs() {
+                labTabsContainer.innerHTML = '';
                 LABS.forEach(lab => {
-                    if (!reservations[lab]) {
-                        reservations[lab] = {};
-                    }
+                    const tab = document.createElement('button');
+                    tab.textContent = lab.split(' ')[0];
+                    tab.className = `px-4 py-2 text-sm font-medium rounded-md border transition ${lab === currentLab ? 'tab-active' : 'tab-inactive'}`;
+                    tab.onclick = () => {
+                        currentLab = lab;
+                        renderTabs();
+                        renderCalendar();
+                    };
+                    labTabsContainer.appendChild(tab);
                 });
-                console.log("從 Firebase 更新資料成功！");
-            } else {
-                console.log("資料庫是空的，使用初始結構。");
-                // 如果資料庫是空的，確保本地 reservations 是初始狀態
-                reservations = {};
-                LABS.forEach(lab => reservations[lab] = {});
             }
-            // 收到新資料後，重新渲染行事曆
+            
+            // --- Firebase 資料庫處理 ---
+
+            // 監聽 Firebase 資料庫的變化
+            const reservationsRef = database.ref('reservations');
+            reservationsRef.on('value', (snapshot) => {
+                const data = snapshot.val();
+                if (data) {
+                    reservations = data;
+                    LABS.forEach(lab => {
+                        if (!reservations[lab]) reservations[lab] = {};
+                    });
+                    console.log("從 Firebase 更新資料成功！");
+                } else {
+                    console.log("資料庫是空的，使用初始結構。");
+                }
+                renderCalendar(); 
+            });
+
+            // 預約與取消的處理函數 (使用 Firebase)
+            function handleReservation(isBooking) {
+                const className = classSelect.value;
+                const teacherName = teacherSelect.value;
+                const labName = labSelect.value;
+                const selectedDate = new Date(dateInput.value);
+                const period = periodSelect.value;
+
+                if (isNaN(selectedDate.getTime())) {
+                    showToast('請選擇一個有效的預約日期。', true);
+                    return;
+                }
+                if (selectedDate.getDay() === 0) {
+                    showToast('星期日不開放預約。', true);
+                    return;
+                }
+
+                const key = `${formatDate(selectedDate)}-${period}`;
+                const reservationSlotRef = database.ref(`reservations/${labName}/${key}`);
+
+                if (isBooking) {
+                    reservationSlotRef.transaction((currentData) => {
+                        if (currentData === null) {
+                            showToast(`預約成功：${className} 已預約 ${labName}。`);
+                            return { class: className, teacher: teacherName };
+                        } else {
+                            showToast(`預約失敗：該時段已被 ${currentData.class} 預約。`, true);
+                            return;
+                        }
+                    });
+                } else { // Cancelling
+                    reservationSlotRef.transaction((currentData) => {
+                        if (currentData === null) {
+                            showToast('取消失敗：找不到該預約紀錄。', true);
+                            return;
+                        }
+                        if (currentData.class === className && currentData.teacher === teacherName) {
+                            showToast(`取消成功：${className} 已取消 ${labName} 的預約。`);
+                            return null;
+                        } else {
+                            showToast(`取消失敗：預約資訊不符，無法取消。`, true);
+                            return;
+                        }
+                    });
+                }
+            }
+            
+            // --- 初始化與事件綁定 ---
+            
+            // 1. 立即產生下拉選單、日期、和頁籤
+            populateClasses();
+            populateTeachers();
+            dateInput.value = formatDate(new Date());
+            renderTabs();
+            
+            // 2. 立即畫出一次行事曆的「框架」
+            // (Firebase連上後會自動帶入資料並重畫一次)
             renderCalendar(); 
+            
+            // 3. 綁定按鈕事件
+            bookBtn.addEventListener('click', () => handleReservation(true));
+            cancelBtn.addEventListener('click', () => handleReservation(false));
+            dateInput.addEventListener('change', renderCalendar);
         });
-
-        // 顯示提示訊息 (不變)
-        function showToast(message, isError = false) { /* ... 內容不變 ... */ }
-        // 格式化日期 (不變)
-        function formatDate(date) { /* ... 內容不變 ... */ }
-        // 取得星期 (不變)
-        function getWeekDays(selectedDate) { /* ... 內容不變 ... */ }
-        // 產生班級選項 (不變)
-        function populateClasses() { /* ... 內容不變 ... */ }
-        // 產生老師選項 (不變)
-        function populateTeachers() { /* ... 內容不變 ... */ }
-        // 渲染行事曆 (不變)
-        function renderCalendar() { /* ... 內容不變 ... */ }
-        // 渲染實驗室分頁標籤 (不變)
-        function renderTabs() { /* ... 內容不變 ... */ }
-
-
-        // 【修改 3/4】修改預約處理邏輯，直接寫入 Firebase
-        function handleReservation(isBooking) {
-            const className = classSelect.value;
-            const teacherName = teacherSelect.value;
-            const labName = labSelect.value;
-            const selectedDate = new Date(dateInput.value);
-            const period = periodSelect.value;
-
-            // ... 日期檢查邏輯不變 ...
-
-            const key = `${formatDate(selectedDate)}-${period}`;
-            // 建立指向特定預約時段的資料庫參照
-            const reservationSlotRef = database.ref(`reservations/${labName}/${key}`);
-
-            if (isBooking) {
-                // 使用 transaction 來處理預約，避免兩個人同時預約同一個時段 (race condition)
-                reservationSlotRef.transaction((currentData) => {
-                    if (currentData === null) {
-                        // 這個時段是空的，可以預約
-                        showToast(`預約成功：${className} 已預約 ${labName}。`);
-                        return { class: className, teacher: teacherName }; // 回傳要寫入的資料
-                    } else {
-                        // 這個時段已經被預約了
-                        showToast(`預約失敗：該時段已被 ${currentData.class} 預約。`, true);
-                        return; // 回傳 undefined 來中止操作
-                    }
-                });
-            } else { // 取消預約
-                reservationSlotRef.transaction((currentData) => {
-                    if (currentData === null) {
-                        showToast('取消失敗：找不到該預約紀錄。', true);
-                        return;
-                    }
-                    if (currentData.class === className) {
-                        showToast(`取消成功：${className} 已取消 ${labName} 的預約。`);
-                        return null; // 回傳 null 會從資料庫中刪除該筆資料
-                    } else {
-                        showToast(`取消失敗：該時段是由 ${currentData.class} 預約，非本班級。`, true);
-                        return;
-                    }
-                });
-            }
-        }
-        
-        // --- 事件監聽器 (不變) ---
-        bookBtn.addEventListener('click', () => handleReservation(true));
-        cancelBtn.addEventListener('click', () => handleReservation(false));
-        dateInput.addEventListener('change', renderCalendar);
-
-        // --- 初始化 ---
-        // 【修改 4/4】這裡不再需要手動渲染，因為 Firebase 的 .on() 會在初次載入時自動觸發
-        populateClasses();
-        populateTeachers();
-        dateInput.value = formatDate(new Date());
-        renderTabs();
-        // renderCalendar(); // <-- 這一行可以刪除或註解掉
-    });
     </script>
+
+</body>
+</html>
 </body>
 </html>
