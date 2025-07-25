@@ -334,7 +334,18 @@
                     }
                 }
             }
-                    const WEB_APP_URL = "https://script.google.com/a/macros/ms.mingdao.edu.tw/s/AKfycbwGsR5lbaw4dmx5QyctAvUBOdrY6QlYF26YllKpU1l2u7-oMvJPWK3Pywc5E4HKIN2o3g/exec";
+function saveReservation(className, teacherName, labName, date, period) {
+    fetch(WEB_APP_URL, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ className, teacherName, labName, date, period })
+    })
+    .then(res => res.text())
+    .then(txt => showToast("預約已儲存！"))
+    .catch(() => showToast("無法儲存預約", true));
+}
 
             bookBtn.addEventListener('click', () => handleReservation(true));
             cancelBtn.addEventListener('click', () => handleReservation(false));
