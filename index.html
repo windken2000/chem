@@ -334,19 +334,34 @@
                     }
                 }
             }
-function saveReservation(className, teacherName, labName, date, period) {
-    fetch(https://script.google.com/macros/s/AKfycbw9v7DVrQ1eeOqacpWSuC2Fd1DGtEPrA0ZZLupT02H3xFerueFvApFN-g3wxphGCfVdjg/exec, {
+document.getElementById("bookingForm").addEventListener("submit", function(event) {
+    event.preventDefault();
+
+    const data = {
+
+        className: document.getElementById("className").value,
+        teacherName: document.getElementById("teacherName").value,
+        labName: document.getElementById("labName").value,
+        selectedDate: document.getElementById("selectedDate").value,
+        period: document.getElementById("period").value
+    };
+
+    fetch("https://script.google.com/macros/s/AKfycbw9v7DVrQ1eeOqacpWSuC2Fd1DGtEPrA0ZZLupT02H3xFerueFvApFN-g3wxphGCfVdjg/exec", {
         method: "POST",
+        body: JSON.stringify(data),
         headers: {
             "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ className, teacherName, labName, date, period })
-    })
-    .then(res => res.text())
-    .then(txt => showToast("預約已儲存！"))
-    .catch(() => showToast("無法儲存預約", true));
-}
-
+        }
+    }).then(res => res.json())
+      .then(response => {
+          if (response.result === "success") {
+              alert("預約成功！資料已儲存。");
+              document.getElementById("bookingForm").reset();
+          } else {
+              alert("提交失敗，請稍後再試。");
+          }
+      });
+});
             bookBtn.addEventListener('click', () => handleReservation(true));
             cancelBtn.addEventListener('click', () => handleReservation(false));
             dateInput.addEventListener('change', renderCalendar);
