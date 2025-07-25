@@ -338,30 +338,6 @@
             bookBtn.addEventListener('click', () => handleReservation(true));
             cancelBtn.addEventListener('click', () => handleReservation(false));
             dateInput.addEventListener('change', renderCalendar);
-    const data = {
-
-        class-name: document.getElementById("class-name").value,
-        teacher-name: document.getElementById("teacher-name").value,
-        lab-name: document.getElementById("lab-name").value,
-        selected-date: document.getElementById("selected-date").value,
-        period: document.getElementById("period").value
-    };
-
-    fetch("https://script.google.com/macros/s/AKfycbw9v7DVrQ1eeOqacpWSuC2Fd1DGtEPrA0ZZLupT02H3xFerueFvApFN-g3wxphGCfVdjg/exec", {
-        method: "POST",
-        body: JSON.stringify(data),
-        headers: {
-            "Content-Type": "application/json"
-        }
-    }).then(res => res.json())
-      .then(response => {
-          if (response.result === "success") {
-              alert("預約成功！資料已儲存。");
-              document.getElementById("bookingForm").reset();
-          } else {
-              alert("提交失敗，請稍後再試。");
-          }
-      });
 
             // --- 初始化 ---
             populateClasses();
