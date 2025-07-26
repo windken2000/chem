@@ -242,11 +242,11 @@
                 const advancedOptgroup = document.createElement('optgroup');
                 advancedOptgroup.label = '資優班';
                 const advancedGrades = ['國一', '國二', '國三'];
-                const advancedClassNames = ['A', 'B', 'C', '拔尖'];
+                const advancedClassNames = ['理資A', '理資B', '理資C', '拔尖'];
                 advancedGrades.forEach(grade => {
                     advancedClassNames.forEach(clsName => {
                         const option = document.createElement('option');
-                        const fullClassName = `${grade}理資${clsName}班`;
+                        const fullClassName = `${grade}${clsName}班`;
                         option.value = fullClassName;
                         option.textContent = fullClassName;
                         advancedOptgroup.appendChild(option);
