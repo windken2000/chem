@@ -187,8 +187,30 @@
             }
 
             function formatDate(date) {
-                // 將日期格式化為 YYYY-MM-DD
-                return date.toISOString().split('T')[0];
+                // 將日期格式化為 YYYY-MM-DD (使用本地時間，避免 UTC 造成早上 8 點前日期少一天)
+                const year = date.getFullYear();
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const day = String(date.getDate()).padStart(2, '0');
+                return `${year}-${month}-${day}`;
+            }
+
+            function parseDate(value) {
+                // 將 YYYY-MM-DD 解析為本地時間的日期 (new Date('YYYY-MM-DD') 會被當成 UTC)
+                if (value instanceof Date) return new Date(value);
+                const [y, m, d] = String(value).split('-').map(Number);
+                return new Date(y, m - 1, d);
+            }
+
+            function periodLabel(period) {
+                // '第 1 節 (08:10-09:00)' -> '第 1 節'
+                return String(period).replace(/\s*\(.*\)\s*$/, '');
+            }
+
+            function escapeHtml(value) {
+                // 避免資料庫中的文字被當成 HTML 執行
+                return String(value ?? '').replace(/[&<>"']/g, ch => ({
+                    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+                }[ch]));
             }
             
             function formatDateTime(date) {
@@ -203,7 +225,7 @@
             }
             
             function getWeekDays(selectedDate) {
-                const date = new Date(selectedDate);
+                const date = parseDate(selectedDate);
                 const day = date.getDay();
                 // 計算本週一的日期 (如果 selectedDate 是星期日，則減去 6 天；否則減去 (day - 1) 天)
                 const diff = date.getDate() - day + (day === 0 ? -6 : 1);
@@ -283,14 +305,14 @@
                 html += `<tbody>`;
                 PERIODS.forEach((period) => {
                     html += `<tr class="text-center">`;
-                    html += `<td class="p-3 border border-gray-200 font-medium text-sm text-gray-500">${period.split(' ')[0]}<br><span class="text-xs">${period.match(/\((.*)\)/)[1]}</span></td>`;
+                    html += `<td class="p-3 border border-gray-200 font-medium text-sm text-gray-500">${periodLabel(period)}<br><span class="text-xs">${period.match(/\((.*)\)/)[1]}</span></td>`;
                     weekDays.forEach((date) => {
                         const key = `${formatDate(date)}-${period}`;
                         const reservation = reservations[currentLab] ? reservations[currentLab][key] : null;
                         if (reservation) {
                             html += `<td class="p-3 border border-gray-200 calendar-cell booked text-sm">
-                                            <div class="font-bold">${reservation.class}</div>
-                                            <div class="text-xs mt-1">${reservation.teacher}</div>
+                                            <div class="font-bold">${escapeHtml(reservation.class)}</div>
+                                            <div class="text-xs mt-1">${escapeHtml(reservation.teacher)}</div>
                                         </td>`;
                         } else {
                             html += `<td class="p-3 border border-gray-200 calendar-cell available text-sm">
@@ -361,10 +383,18 @@
                     sortedLogs.forEach(log => {
                         const logItem = document.createElement('div');
                         let detailHtml = '';
-                        if (log.class && log.teacher && log.lab && log.date && log.period) {
-                            detailHtml = `<span class="font-semibold">${log.class}</span> <span class="text-gray-600">(${log.teacher})</span> 預約了 <span class="font-semibold">${log.lab}</span> 在 <span class="font-semibold">${log.date} ${log.period.split(' ')[0]}</span>`;
-                        } else if (log.lab && log.date && log.period) {
-                             detailHtml = `實驗室 <span class="font-semibold">${log.lab}</span> 在 <span class="font-semibold">${log.date} ${log.period.split(' ')[0]}</span>`;
+                        const type = String(log.type || '');
+                        const actionText = type === '預約成功' ? '預約了'
+                            : type === '取消成功' ? '取消了'
+                            : type.startsWith('取消') || log.action === '嘗試取消' ? '嘗試取消'
+                            : '嘗試預約';
+                        const slotHtml = log.lab && log.date && log.period
+                            ? `<span class="font-semibold">${escapeHtml(log.lab)}</span> 在 <span class="font-semibold">${escapeHtml(log.date)} ${escapeHtml(periodLabel(log.period))}</span>`
+                            : '';
+                        if (log.class && log.teacher && slotHtml) {
+                            detailHtml = `<span class="font-semibold">${escapeHtml(log.class)}</span> <span class="text-gray-600">(${escapeHtml(log.teacher)})</span> ${actionText} ${slotHtml}`;
+                        } else if (slotHtml) {
+                            detailHtml = `實驗室 ${slotHtml}`;
                         }
 
                         let messageColorClass = 'text-gray-700';
@@ -376,10 +406,10 @@
                             messageColorClass = 'text-red-700';
                         }
 
-                        logItem.className = `p-2 rounded-md ${log.type.includes('成功') ? 'bg-green-50' : log.type.includes('失敗') || log.type.includes('錯誤') ? 'bg-red-50' : 'bg-gray-100'} shadow-sm`;
+                        logItem.className = `p-2 rounded-md ${type.includes('成功') ? 'bg-green-50' : type.includes('失敗') || type.includes('錯誤') ? 'bg-red-50' : 'bg-gray-100'} shadow-sm`;
                         logItem.innerHTML = `
-                            <div class="text-xs text-gray-500 mb-1">${log.dateTime}</div>
-                            <div class="${messageColorClass} font-medium">${log.message}</div>
+                            <div class="text-xs text-gray-500 mb-1">${escapeHtml(log.dateTime)}</div>
+                            <div class="${messageColorClass} font-medium">${escapeHtml(log.message)}</div>
                             ${detailHtml ? `<div class="text-xs text-gray-600 mt-1">${detailHtml}</div>` : ''}
                         `;
                         logDisplay.appendChild(logItem);
@@ -387,8 +417,8 @@
                 } else {
                     logDisplay.innerHTML = '<p class="text-gray-500">尚無操作紀錄。</p>';
                 }
-                // 讓滾動條自動滾到底部，顯示最新紀錄
-                logDisplay.scrollTop = logDisplay.scrollHeight;
+                // 最新紀錄排在最上面，讓滾動條回到頂端
+                logDisplay.scrollTop = 0;
             });
 
 
@@ -396,7 +426,9 @@
 
             // 監聽 Firebase 資料庫的變化
             const reservationsRef = database.ref('reservations');
+            let dataLoaded = false;
             reservationsRef.on('value', (snapshot) => {
+                dataLoaded = true;
                 const data = snapshot.val();
                 if (data) {
                     reservations = data;
@@ -415,11 +447,15 @@
                 const className = classSelect.value;
                 const teacherName = teacherSelect.value;
                 const labName = labSelect.value;
-                const selectedDate = new Date(dateInput.value);
+                const selectedDate = parseDate(dateInput.value);
                 const period = periodSelect.value;
                 const formattedDate = formatDate(selectedDate); // 新增格式化日期
 
-                if (isNaN(selectedDate.getTime())) {
+                if (!dataLoaded) {
+                    showToast('資料載入中，請稍候再試。', true);
+                    return;
+                }
+                if (!dateInput.value || isNaN(selectedDate.getTime())) {
                     showToast('請選擇一個有效的預約日期。', true);
                     writeLogEntry('操作錯誤', '無效日期選擇', {
                         class: className,
@@ -443,70 +479,75 @@
                     });
                     return;
                 }
+                if (isBooking && formattedDate < formatDate(new Date())) {
+                    showToast('無法預約已經過去的日期。', true);
+                    return;
+                }
 
                 const key = `${formattedDate}-${period}`;
                 const reservationSlotRef = database.ref(`reservations/${labName}/${key}`);
+                const logDetails = {
+                    class: className,
+                    teacher: teacherName,
+                    lab: labName,
+                    date: formattedDate,
+                    period: period
+                };
+
+                // 注意：transaction 的更新函式可能被 Firebase 重複呼叫，
+                // 所以這裡只決定要寫入什麼，提示與紀錄都放在完成回呼中處理。
+                bookBtn.disabled = cancelBtn.disabled = true;
+                const done = () => { bookBtn.disabled = cancelBtn.disabled = false; };
 
                 if (isBooking) {
                     reservationSlotRef.transaction((currentData) => {
                         if (currentData === null) {
-                            showToast(`預約成功：${className} 已預約 ${labName}。`);
-                            writeLogEntry('預約成功', `${className} 成功預約`, {
-                                class: className,
-                                teacher: teacherName,
-                                lab: labName,
-                                date: formattedDate,
-                                period: period
-                            });
                             return { class: className, teacher: teacherName };
+                        }
+                        return; // 已被預約，中止交易，不寫入
+                    }, (error, committed, snapshot) => {
+                        done();
+                        if (error) {
+                            showToast(`預約失敗：${error.message}`, true);
+                            writeLogEntry('預約失敗', `系統錯誤：${error.message}`, logDetails);
+                        } else if (committed) {
+                            showToast(`預約成功：${className} 已預約 ${labName}。`);
+                            writeLogEntry('預約成功', `${className} 成功預約`, logDetails);
                         } else {
-                            showToast(`預約失敗：該時段已被 ${currentData.class} 預約。`, true);
-                            writeLogEntry('預約失敗', `該時段已被 ${currentData.class} 預約`, {
-                                class: className,
-                                teacher: teacherName,
-                                lab: labName,
-                                date: formattedDate,
-                                period: period,
-                                currentBookedBy: currentData.class // 記錄當前預約者
+                            const current = snapshot && snapshot.val();
+                            const bookedBy = current ? current.class : '其他班級';
+                            showToast(`預約失敗：該時段已被 ${bookedBy} 預約。`, true);
+                            writeLogEntry('預約失敗', `該時段已被 ${bookedBy} 預約`, {
+                                ...logDetails,
+                                currentBookedBy: bookedBy // 記錄當前預約者
                             });
-                            return; // 中止交易，不寫入
                         }
                     });
                 } else { // Cancelling
                     reservationSlotRef.transaction((currentData) => {
-                        if (currentData === null) {
-                            showToast('取消失敗：找不到該預約紀錄。', true);
-                            writeLogEntry('取消失敗', '找不到該預約紀錄', {
-                                class: className,
-                                teacher: teacherName,
-                                lab: labName,
-                                date: formattedDate,
-                                period: period
-                            });
-                            return;
-                        }
-                        if (currentData.class === className && currentData.teacher === teacherName) {
-                            showToast(`取消成功：${className} 已取消 ${labName} 的預約。`);
-                            writeLogEntry('取消成功', `${className} 成功取消預約`, {
-                                class: className,
-                                teacher: teacherName,
-                                lab: labName,
-                                date: formattedDate,
-                                period: period
-                            });
+                        if (currentData !== null && currentData.class === className && currentData.teacher === teacherName) {
                             return null; // 移除該預約紀錄
+                        }
+                        return; // 找不到或資訊不符，中止交易
+                    }, (error, committed, snapshot) => {
+                        done();
+                        const current = snapshot && snapshot.val();
+                        if (error) {
+                            showToast(`取消失敗：${error.message}`, true);
+                            writeLogEntry('取消失敗', `系統錯誤：${error.message}`, logDetails);
+                        } else if (committed) {
+                            showToast(`取消成功：${className} 已取消 ${labName} 的預約。`);
+                            writeLogEntry('取消成功', `${className} 成功取消預約`, logDetails);
+                        } else if (!current) {
+                            showToast('取消失敗：找不到該預約紀錄。', true);
+                            writeLogEntry('取消失敗', '找不到該預約紀錄', logDetails);
                         } else {
-                            showToast(`取消失敗：預約資訊不符，無法取消。`, true);
+                            showToast('取消失敗：預約資訊不符，無法取消。', true);
                             writeLogEntry('取消失敗', '預約資訊不符，無法取消', {
-                                class: className,
-                                teacher: teacherName,
-                                lab: labName,
-                                date: formattedDate,
-                                period: period,
-                                actualBookedBy: currentData.class, // 記錄實際預約者
-                                actualTeacher: currentData.teacher // 記錄實際預約老師
+                                ...logDetails,
+                                actualBookedBy: current.class, // 記錄實際預約者
+                                actualTeacher: current.teacher // 記錄實際預約老師
                             });
-                            return;
                         }
                     });
                 }
