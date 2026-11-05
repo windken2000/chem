@@ -122,6 +122,49 @@
         <div id="log-display" class="space-y-2 text-sm text-gray-700 max-h-96 overflow-y-auto p-2 border border-gray-200 rounded-md bg-gray-50">
             載入中...
         </div>
+        <div class="mt-4 text-center">
+            <button type="button" id="full-log-btn" class="py-2 px-5 bg-white border border-gray-300 text-gray-700 font-medium rounded-lg shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 transition">
+                查看完整操作紀錄
+            </button>
+        </div>
+    </div>
+
+    <!-- 完整操作紀錄視窗 -->
+    <div id="full-log-modal" class="hidden fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-2 md:p-6">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-4xl max-h-full flex flex-col">
+            <div class="flex items-center justify-between p-4 md:p-6 border-b">
+                <h2 class="text-xl md:text-2xl font-bold text-gray-700">完整操作紀錄</h2>
+                <button type="button" id="full-log-close" class="text-gray-500 hover:text-gray-800 text-3xl leading-none px-2" aria-label="關閉">&times;</button>
+            </div>
+            <div class="p-4 md:px-6 border-b grid grid-cols-2 md:grid-cols-6 gap-3 text-sm">
+                <input type="search" id="full-log-search" placeholder="搜尋班級、老師…" class="col-span-2 p-2 border border-gray-300 rounded-lg">
+                <select id="full-log-type" class="p-2 border border-gray-300 rounded-lg">
+                    <option value="">全部類型</option>
+                    <option value="預約成功">預約成功</option>
+                    <option value="取消成功">取消成功</option>
+                    <option value="fail">失敗 / 錯誤</option>
+                </select>
+                <select id="full-log-lab" class="p-2 border border-gray-300 rounded-lg">
+                    <option value="">全部實驗室</option>
+                </select>
+                <label class="flex flex-col text-xs text-gray-500">操作日期從
+                    <input type="date" id="full-log-from" class="p-2 border border-gray-300 rounded-lg text-sm text-gray-700">
+                </label>
+                <label class="flex flex-col text-xs text-gray-500">到
+                    <input type="date" id="full-log-to" class="p-2 border border-gray-300 rounded-lg text-sm text-gray-700">
+                </label>
+            </div>
+            <div class="flex flex-wrap items-center justify-between gap-2 px-4 md:px-6 py-3 text-sm">
+                <span id="full-log-count" class="text-gray-500"></span>
+                <button type="button" id="full-log-csv" class="py-1.5 px-4 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition">下載 CSV (Excel)</button>
+            </div>
+            <div class="flex-1 overflow-y-auto px-4 md:px-6 pb-4">
+                <div id="full-log-list" class="space-y-2 text-sm text-gray-700"></div>
+                <div class="text-center mt-4">
+                    <button type="button" id="full-log-more" class="hidden py-2 px-5 bg-gray-100 text-gray-700 font-medium rounded-lg hover:bg-gray-200 transition"></button>
+                </div>
+            </div>
+        </div>
     </div>
     
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
@@ -372,15 +415,8 @@
                     });
             }
 
-            // 監聽 Firebase 'logs' 節點的變化並顯示
-            const logsRef = database.ref('logs');
-            logsRef.limitToLast(20).on('value', (snapshot) => { // 只顯示最新的20條紀錄
-                const logsData = snapshot.val();
-                logDisplay.innerHTML = ''; // 清空現有紀錄
-                if (logsData) {
-                    // 將物件轉換為陣列並按時間戳排序 (最新的在前)
-                    const sortedLogs = Object.values(logsData).sort((a, b) => b.timestamp - a.timestamp);
-                    sortedLogs.forEach(log => {
+            // 產生單筆操作紀錄的顯示元素 (最新紀錄與完整紀錄共用)
+            function renderLogItem(log) {
                         const logItem = document.createElement('div');
                         let detailHtml = '';
                         const type = String(log.type || '');
@@ -412,14 +448,126 @@
                             <div class="${messageColorClass} font-medium">${escapeHtml(log.message)}</div>
                             ${detailHtml ? `<div class="text-xs text-gray-600 mt-1">${detailHtml}</div>` : ''}
                         `;
-                        logDisplay.appendChild(logItem);
-                    });
+                        return logItem;
+            }
+
+            // 監聽 Firebase 'logs' 節點的變化並顯示
+            const logsRef = database.ref('logs');
+            logsRef.limitToLast(20).on('value', (snapshot) => { // 只顯示最新的20條紀錄
+                const logsData = snapshot.val();
+                logDisplay.innerHTML = ''; // 清空現有紀錄
+                if (logsData) {
+                    // 將物件轉換為陣列並按時間戳排序 (最新的在前)
+                    const sortedLogs = Object.values(logsData).sort((a, b) => b.timestamp - a.timestamp);
+                    sortedLogs.forEach(log => logDisplay.appendChild(renderLogItem(log)));
                 } else {
                     logDisplay.innerHTML = '<p class="text-gray-500">尚無操作紀錄。</p>';
                 }
                 // 最新紀錄排在最上面，讓滾動條回到頂端
                 logDisplay.scrollTop = 0;
             });
+
+            // --- 完整操作紀錄 (點按鈕後開啟) ---
+            const PAGE_SIZE = 50;
+            const fullLogModal = document.getElementById('full-log-modal');
+            const fullLogList = document.getElementById('full-log-list');
+            const fullLogCount = document.getElementById('full-log-count');
+            const fullLogMore = document.getElementById('full-log-more');
+            const fullLogSearch = document.getElementById('full-log-search');
+            const fullLogType = document.getElementById('full-log-type');
+            const fullLogLab = document.getElementById('full-log-lab');
+            const fullLogFrom = document.getElementById('full-log-from');
+            const fullLogTo = document.getElementById('full-log-to');
+            let allLogs = [];
+            let filteredLogs = [];
+            let shownCount = 0;
+
+            LABS.forEach(lab => {
+                const option = document.createElement('option');
+                option.value = lab;
+                option.textContent = lab;
+                fullLogLab.appendChild(option);
+            });
+
+            function openFullLog() {
+                fullLogModal.classList.remove('hidden');
+                document.body.style.overflow = 'hidden';
+                fullLogList.innerHTML = '<p class="text-gray-500 p-2">載入中...</p>';
+                fullLogCount.textContent = '';
+                fullLogMore.classList.add('hidden');
+                // 每次開啟時重新讀取，確保看到最新的完整紀錄
+                logsRef.once('value').then((snapshot) => {
+                    allLogs = Object.values(snapshot.val() || {}).sort((a, b) => b.timestamp - a.timestamp);
+                    applyLogFilters();
+                }).catch((error) => {
+                    fullLogList.innerHTML = `<p class="text-red-600 p-2">讀取失敗：${escapeHtml(error.message)}</p>`;
+                });
+            }
+
+            function closeFullLog() {
+                fullLogModal.classList.add('hidden');
+                document.body.style.overflow = '';
+            }
+
+            function applyLogFilters() {
+                const keyword = fullLogSearch.value.trim().toLowerCase();
+                const type = fullLogType.value;
+                const lab = fullLogLab.value;
+                const from = fullLogFrom.value;
+                const to = fullLogTo.value;
+                filteredLogs = allLogs.filter(log => {
+                    const logType = String(log.type || '');
+                    if (type === 'fail' && !(logType.includes('失敗') || logType.includes('錯誤'))) return false;
+                    if (type && type !== 'fail' && logType !== type) return false;
+                    if (lab && log.lab !== lab) return false;
+                    const day = String(log.dateTime || '').slice(0, 10);
+                    if (from && day < from) return false;
+                    if (to && day > to) return false;
+                    if (keyword) {
+                        const text = [log.message, log.class, log.teacher, log.lab, log.date].join(' ').toLowerCase();
+                        if (!text.includes(keyword)) return false;
+                    }
+                    return true;
+                });
+                fullLogList.innerHTML = '';
+                shownCount = 0;
+                if (filteredLogs.length === 0) {
+                    fullLogList.innerHTML = '<p class="text-gray-500 p-2">沒有符合條件的紀錄。</p>';
+                }
+                showMoreLogs();
+            }
+
+            function showMoreLogs() {
+                filteredLogs.slice(shownCount, shownCount + PAGE_SIZE).forEach(log => fullLogList.appendChild(renderLogItem(log)));
+                shownCount = Math.min(shownCount + PAGE_SIZE, filteredLogs.length);
+                fullLogCount.textContent = `共 ${allLogs.length} 筆紀錄，符合條件 ${filteredLogs.length} 筆，目前顯示 ${shownCount} 筆`;
+                fullLogMore.classList.toggle('hidden', shownCount >= filteredLogs.length);
+                fullLogMore.textContent = `顯示更多 (還有 ${filteredLogs.length - shownCount} 筆)`;
+            }
+
+            function downloadLogsCsv() {
+                const header = ['操作時間', '類型', '訊息', '班級', '老師', '實驗室', '預約日期', '節次'];
+                const rows = filteredLogs.map(log => [log.dateTime, log.type, log.message, log.class, log.teacher, log.lab, log.date, log.period]);
+                const csv = [header, ...rows]
+                    .map(row => row.map(value => `"${String(value ?? '').replace(/"/g, '""')}"`).join(','))
+                    .join('\r\n');
+                // 加上 BOM，讓 Excel 正確顯示中文
+                const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = `實驗室預約操作紀錄_${formatDate(new Date())}.csv`;
+                link.click();
+                URL.revokeObjectURL(link.href);
+            }
+
+            document.getElementById('full-log-btn').addEventListener('click', openFullLog);
+            document.getElementById('full-log-close').addEventListener('click', closeFullLog);
+            document.getElementById('full-log-csv').addEventListener('click', downloadLogsCsv);
+            fullLogMore.addEventListener('click', showMoreLogs);
+            fullLogModal.addEventListener('click', (e) => { if (e.target === fullLogModal) closeFullLog(); });
+            document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !fullLogModal.classList.contains('hidden')) closeFullLog(); });
+            fullLogSearch.addEventListener('input', applyLogFilters);
+            [fullLogType, fullLogLab, fullLogFrom, fullLogTo].forEach(el => el.addEventListener('change', applyLogFilters));
 
 
             // --- Firebase 資料庫處理 ---
