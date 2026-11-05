@@ -56,6 +56,24 @@
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <div class="lg:col-span-1 bg-white p-6 rounded-2xl shadow-lg">
                 <h2 class="text-2xl font-bold text-gray-700 mb-6 border-b pb-3">預約操作面板</h2>
+                <!-- 登入狀態 -->
+                <div id="auth-signed-out" class="mb-5 p-4 rounded-lg bg-blue-50 border border-blue-200 text-sm text-blue-900">
+                    <p class="mb-3">請先使用<span class="font-semibold">學校 Google 帳號</span>登入，才能預約或取消。</p>
+                    <button type="button" id="sign-in-btn" class="w-full py-2.5 px-4 bg-white border border-gray-300 text-gray-700 font-semibold rounded-lg shadow-sm hover:bg-gray-50 transition flex items-center justify-center gap-2">
+                        <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>
+                        使用 Google 登入
+                    </button>
+                </div>
+                <div id="auth-signed-in" class="hidden mb-5 p-3 rounded-lg bg-gray-50 border border-gray-200 text-sm flex items-center justify-between gap-2">
+                    <div class="min-w-0">
+                        <div class="text-gray-500 text-xs">已登入</div>
+                        <div id="auth-user" class="font-semibold text-gray-800 truncate"></div>
+                    </div>
+                    <button type="button" id="sign-out-btn" class="shrink-0 py-1.5 px-3 text-gray-600 border border-gray-300 rounded-lg hover:bg-white transition">登出</button>
+                </div>
+                <button type="button" id="admin-btn" class="hidden w-full mb-5 py-2 px-4 bg-amber-50 border border-amber-300 text-amber-800 font-semibold rounded-lg hover:bg-amber-100 transition">
+                    ⚙ 管理設定：班級、教師、實驗室
+                </button>
                 <form id="reservation-form" class="space-y-5">
                     <div>
                         <label for="class-name" class="block text-sm font-medium text-gray-700 mb-1">預約班級</label>
@@ -68,9 +86,6 @@
                     <div>
                         <label for="lab-name" class="block text-sm font-medium text-gray-700 mb-1">實驗室</label>
                         <select id="lab-name" name="lab-name" class="w-full p-3 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
-                            <option>A (亞佛加厥)</option>
-                            <option>B (波以耳)</option>
-                            <option>C (居禮)</option>
                         </select>
                     </div>
                     <div>
@@ -122,10 +137,55 @@
         <div id="log-display" class="space-y-2 text-sm text-gray-700 max-h-96 overflow-y-auto p-2 border border-gray-200 rounded-md bg-gray-50">
             載入中...
         </div>
-        <div class="mt-4 text-center">
+        <div id="full-log-btn-wrap" class="hidden mt-4 text-center">
             <button type="button" id="full-log-btn" class="py-2 px-5 bg-white border border-gray-300 text-gray-700 font-medium rounded-lg shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 transition">
                 查看完整操作紀錄
             </button>
+        </div>
+    </div>
+
+    <!-- 管理設定視窗 (僅管理員) -->
+    <div id="admin-modal" class="hidden fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-2 md:p-6">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-5xl max-h-full flex flex-col">
+            <div class="flex items-center justify-between p-4 md:p-6 border-b">
+                <div>
+                    <h2 class="text-xl md:text-2xl font-bold text-gray-700">管理設定</h2>
+                    <p class="text-sm text-gray-500 mt-1">新增或移除後按「儲存」，所有老師的下拉選單會立即更新。</p>
+                </div>
+                <button type="button" id="admin-close" class="text-gray-500 hover:text-gray-800 text-3xl leading-none px-2" aria-label="關閉">&times;</button>
+            </div>
+            <div class="flex-1 overflow-y-auto p-4 md:p-6 grid grid-cols-1 md:grid-cols-3 gap-6">
+                <section data-list="classes">
+                    <h3 class="font-bold text-gray-700 mb-2">班級 <span data-count class="text-sm font-normal text-gray-400"></span></h3>
+                    <div class="flex gap-2 mb-3">
+                        <input type="text" data-input maxlength="20" placeholder="例如：高一13班" class="flex-1 min-w-0 p-2 border border-gray-300 rounded-lg text-sm">
+                        <button type="button" data-add class="shrink-0 py-2 px-3 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700">新增</button>
+                    </div>
+                    <div data-items class="flex flex-wrap gap-1.5 max-h-80 overflow-y-auto"></div>
+                </section>
+                <section data-list="teachers">
+                    <h3 class="font-bold text-gray-700 mb-2">教師 <span data-count class="text-sm font-normal text-gray-400"></span></h3>
+                    <div class="flex gap-2 mb-3">
+                        <input type="text" data-input maxlength="10" placeholder="例如：王小明" class="flex-1 min-w-0 p-2 border border-gray-300 rounded-lg text-sm">
+                        <button type="button" data-add class="shrink-0 py-2 px-3 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700">新增</button>
+                    </div>
+                    <div data-items class="flex flex-wrap gap-1.5 max-h-80 overflow-y-auto"></div>
+                </section>
+                <section data-list="labs">
+                    <h3 class="font-bold text-gray-700 mb-2">實驗室 <span data-count class="text-sm font-normal text-gray-400"></span></h3>
+                    <div class="flex gap-2 mb-3">
+                        <input type="text" data-input maxlength="20" placeholder="例如：D (法拉第)" class="flex-1 min-w-0 p-2 border border-gray-300 rounded-lg text-sm">
+                        <button type="button" data-add class="shrink-0 py-2 px-3 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700">新增</button>
+                    </div>
+                    <p class="text-xs text-gray-500 mb-2">頁籤會顯示第一個空格前的文字，例如「D (法拉第)」顯示為「D」。移除實驗室不會刪除它既有的預約，加回同名稱即可再看到。</p>
+                    <div data-items class="flex flex-wrap gap-1.5 max-h-80 overflow-y-auto"></div>
+                </section>
+            </div>
+            <div class="flex flex-wrap items-center justify-end gap-3 p-4 md:px-6 border-t">
+                <span id="admin-status" class="mr-auto text-sm text-gray-500"></span>
+                <button type="button" id="admin-cancel" class="py-2 px-5 bg-gray-100 text-gray-700 font-medium rounded-lg hover:bg-gray-200">取消</button>
+                <button type="button" id="admin-save" class="py-2 px-5 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700">儲存</button>
+            </div>
         </div>
     </div>
 
@@ -169,6 +229,7 @@
     
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
 
     <script>
         // 1. Firebase 設定
@@ -185,23 +246,34 @@
         // 2. 初始化 Firebase
         firebase.initializeApp(firebaseConfig);
         const database = firebase.database();
+        const auth = firebase.auth();
+
+        // 只允許學校帳號登入；管理員可以取消任何預約
+        // (修改這裡時，Firebase 安全規則中的網域與管理員信箱也要一起改)
+        const ALLOWED_EMAIL_DOMAIN = 'ms.mingdao.edu.tw';
+        const ADMIN_EMAILS = ['windken2000@ms.mingdao.edu.tw', 'tina.chu@ms.mingdao.edu.tw'];
 
         // 3. 等待網頁元素載入後，執行所有操作
         document.addEventListener('DOMContentLoaded', function () {
 
             // --- 全域資料與常數 ---
-            const LABS = ['A (亞佛加厥)', 'B (波以耳)', 'C (居禮)'];
+            // 班級、教師、實驗室清單：預設值，管理員在「管理設定」儲存後改用資料庫中的設定
+            const DEFAULT_LABS = ['A (亞佛加厥)', 'B (波以耳)', 'C (居禮)'];
+            const DEFAULT_TEACHERS = ['丁鋐鎰', '王雅俐', '王志仁', '林佳靜', '林嘉宏', '紀丞哲', '陳文典', '陳國鼎', '陳義忠', '鄭立村', '蘇育慧', '林宗翰', '龍晁毅'];
+            let LABS = DEFAULT_LABS.slice();
             const DAYS_OF_WEEK = ['星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
             const PERIODS = [
                 '第 1 節 (08:10-09:00)', '第 2 節 (09:10-10:00)', '第 3 節 (10:10-11:00)', '第 4 節 (11:10-12:00)',
                 '第 5 節 (13:10-14:00)', '第 6 節 (14:10-15:00)', '第 7 節 (15:10-16:00)', '第 8 節 (16:10-17:00)'
             ];
-            const TEACHERS = ['丁鋐鎰', '王雅俐', '王志仁', '林佳靜', '林嘉宏', '紀丞哲', '陳文典', '陳國鼎', '陳義忠', '鄭立村', '蘇育慧', '林宗翰', '龍晁毅'];
+            let TEACHERS = DEFAULT_TEACHERS.slice();
+            let CLASSES = null; // 在 defaultClasses() 定義後初始化
 
             // --- 狀態管理 ---
             let reservations = {};
             LABS.forEach(lab => reservations[lab] = {});
             let currentLab = LABS[0];
+            let currentUser = null;
 
             // --- 【重要】宣告所有會用到的網頁元素 ---
             const classSelect = document.getElementById('class-name');
@@ -283,50 +355,50 @@
                 return week;
             }
 
-            function populateClasses() {
-                const classGroups = {
-                    '高中部': { prefix: '高', years: 3, count: 12 },
-                    '國中部': { prefix: '國', years: 3, count: 20 }
-                };
-                for (const groupName in classGroups) {
-                    const group = classGroups[groupName];
-                    const optgroup = document.createElement('optgroup');
-                    optgroup.label = groupName;
-                    for (let y = 1; y <= group.years; y++) {
-                        for (let c = 1; c <= group.count; c++) {
-                            const option = document.createElement('option');
-                            let yearInChinese = y === 1 ? '一' : y === 2 ? '二' : '三';
-                            let className = `${group.prefix}${yearInChinese}${c}班`;
-                            option.value = className;
-                            option.textContent = className;
-                            optgroup.appendChild(option);
-                        }
-                    }
-                    classSelect.appendChild(optgroup);
-                }
-                const advancedOptgroup = document.createElement('optgroup');
-                advancedOptgroup.label = '資優班';
-                const advancedGrades = ['國一', '國二', '國三'];
-                const advancedClassNames = ['理資A', '理資B', '理資C', '拔尖'];
-                advancedGrades.forEach(grade => {
-                    advancedClassNames.forEach(clsName => {
-                        const option = document.createElement('option');
-                        const fullClassName = `${grade}${clsName}班`;
-                        option.value = fullClassName;
-                        option.textContent = fullClassName;
-                        advancedOptgroup.appendChild(option);
+            function defaultClasses() {
+                // 預設班級清單 (資料庫還沒有設定時使用)
+                const list = [];
+                [['高', 12], ['國', 20]].forEach(([prefix, count]) => {
+                    ['一', '二', '三'].forEach(year => {
+                        for (let c = 1; c <= count; c++) list.push(`${prefix}${year}${c}班`);
                     });
                 });
-                classSelect.appendChild(advancedOptgroup);
+                ['國一', '國二', '國三'].forEach(grade => {
+                    ['理資A', '理資B', '理資C', '拔尖'].forEach(name => list.push(`${grade}${name}班`));
+                });
+                return list;
             }
 
-            function populateTeachers() {
-                TEACHERS.forEach(teacher => {
-                    const option = document.createElement('option');
-                    option.value = teacher;
-                    option.textContent = teacher;
-                    teacherSelect.appendChild(option);
-                });
+            function classGroupOf(className) {
+                if (/理資|拔尖|資優/.test(className)) return '資優班';
+                if (className.startsWith('高')) return '高中部';
+                if (className.startsWith('國')) return '國中部';
+                return '其他';
+            }
+
+            function fillSelect(select, items, group) {
+                // 重新產生下拉選單，並盡量保留原本選取的值
+                const previous = select.value;
+                select.innerHTML = '';
+                if (group) {
+                    const groups = {};
+                    items.forEach(item => (groups[group(item)] = groups[group(item)] || []).push(item));
+                    ['高中部', '國中部', '資優班', '其他'].filter(name => groups[name]).forEach(name => {
+                        const optgroup = document.createElement('optgroup');
+                        optgroup.label = name;
+                        groups[name].forEach(item => optgroup.appendChild(new Option(item, item)));
+                        select.appendChild(optgroup);
+                    });
+                } else {
+                    items.forEach(item => select.appendChild(new Option(item, item)));
+                }
+                if (items.includes(previous)) select.value = previous;
+            }
+
+            function populateSelects() {
+                fillSelect(classSelect, CLASSES, classGroupOf);
+                fillSelect(teacherSelect, TEACHERS);
+                fillSelect(labSelect, LABS);
             }
 
             function renderCalendar() {
@@ -402,7 +474,11 @@
                     dateTime: formattedTime,
                     type: type,
                     message: message,
-                    ...details
+                    ...details,
+                    // 記錄操作者的登入帳號
+                    uid: currentUser ? currentUser.uid : null,
+                    email: currentUser ? currentUser.email : null,
+                    userName: currentUser ? (currentUser.displayName || '') : null
                 };
 
                 // 將紀錄推送到 'logs' 節點
@@ -447,13 +523,15 @@
                             <div class="text-xs text-gray-500 mb-1">${escapeHtml(log.dateTime)}</div>
                             <div class="${messageColorClass} font-medium">${escapeHtml(log.message)}</div>
                             ${detailHtml ? `<div class="text-xs text-gray-600 mt-1">${detailHtml}</div>` : ''}
+                            ${log.email ? `<div class="text-xs text-gray-400 mt-1">操作帳號：${escapeHtml(log.userName ? `${log.userName} (${log.email})` : log.email)}</div>` : ''}
                         `;
                         return logItem;
             }
 
-            // 監聽 Firebase 'logs' 節點的變化並顯示
+            // 監聽 Firebase 'logs' 節點的變化並顯示 (紀錄含帳號資訊，登入後才能讀取)
             const logsRef = database.ref('logs');
-            logsRef.limitToLast(20).on('value', (snapshot) => { // 只顯示最新的20條紀錄
+            const recentLogsQuery = logsRef.limitToLast(20); // 只顯示最新的20條紀錄
+            function onRecentLogs(snapshot) {
                 const logsData = snapshot.val();
                 logDisplay.innerHTML = ''; // 清空現有紀錄
                 if (logsData) {
@@ -465,7 +543,10 @@
                 }
                 // 最新紀錄排在最上面，讓滾動條回到頂端
                 logDisplay.scrollTop = 0;
-            });
+            }
+            function onRecentLogsError(error) {
+                logDisplay.innerHTML = `<p class="text-red-600">無法讀取操作紀錄：${escapeHtml(error.message)}</p>`;
+            }
 
             // --- 完整操作紀錄 (點按鈕後開啟) ---
             const PAGE_SIZE = 50;
@@ -482,12 +563,13 @@
             let filteredLogs = [];
             let shownCount = 0;
 
-            LABS.forEach(lab => {
-                const option = document.createElement('option');
-                option.value = lab;
-                option.textContent = lab;
-                fullLogLab.appendChild(option);
-            });
+            function refreshFullLogLabOptions() {
+                const previous = fullLogLab.value;
+                fullLogLab.innerHTML = '<option value="">全部實驗室</option>';
+                LABS.forEach(lab => fullLogLab.appendChild(new Option(lab, lab)));
+                if (LABS.includes(previous)) fullLogLab.value = previous;
+            }
+            refreshFullLogLabOptions();
 
             function openFullLog() {
                 fullLogModal.classList.remove('hidden');
@@ -524,7 +606,7 @@
                     if (from && day < from) return false;
                     if (to && day > to) return false;
                     if (keyword) {
-                        const text = [log.message, log.class, log.teacher, log.lab, log.date].join(' ').toLowerCase();
+                        const text = [log.message, log.class, log.teacher, log.lab, log.date, log.email, log.userName].join(' ').toLowerCase();
                         if (!text.includes(keyword)) return false;
                     }
                     return true;
@@ -546,8 +628,8 @@
             }
 
             function downloadLogsCsv() {
-                const header = ['操作時間', '類型', '訊息', '班級', '老師', '實驗室', '預約日期', '節次'];
-                const rows = filteredLogs.map(log => [log.dateTime, log.type, log.message, log.class, log.teacher, log.lab, log.date, log.period]);
+                const header = ['操作時間', '類型', '訊息', '班級', '老師', '實驗室', '預約日期', '節次', '操作帳號', '帳號名稱'];
+                const rows = filteredLogs.map(log => [log.dateTime, log.type, log.message, log.class, log.teacher, log.lab, log.date, log.period, log.email, log.userName]);
                 const csv = [header, ...rows]
                     .map(row => row.map(value => `"${String(value ?? '').replace(/"/g, '""')}"`).join(','))
                     .join('\r\n');
@@ -567,6 +649,7 @@
             fullLogModal.addEventListener('click', (e) => { if (e.target === fullLogModal) closeFullLog(); });
             document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !fullLogModal.classList.contains('hidden')) closeFullLog(); });
             fullLogSearch.addEventListener('input', applyLogFilters);
+            fullLogSearch.placeholder = '搜尋班級、老師、帳號…';
             [fullLogType, fullLogLab, fullLogFrom, fullLogTo].forEach(el => el.addEventListener('change', applyLogFilters));
 
 
@@ -599,6 +682,10 @@
                 const period = periodSelect.value;
                 const formattedDate = formatDate(selectedDate); // 新增格式化日期
 
+                if (!currentUser) {
+                    showToast('請先使用學校 Google 帳號登入。', true);
+                    return;
+                }
                 if (!dataLoaded) {
                     showToast('資料載入中，請稍候再試。', true);
                     return;
@@ -650,7 +737,7 @@
                 if (isBooking) {
                     reservationSlotRef.transaction((currentData) => {
                         if (currentData === null) {
-                            return { class: className, teacher: teacherName };
+                            return { class: className, teacher: teacherName, uid: currentUser.uid };
                         }
                         return; // 已被預約，中止交易，不寫入
                     }, (error, committed, snapshot) => {
@@ -672,11 +759,19 @@
                         }
                     });
                 } else { // Cancelling
+                    const isAdmin = ADMIN_EMAILS.includes(currentUser.email);
+                    // 可以取消的情況：管理員；登入後建立的預約只有預約者本人；
+                    // 登入功能上線前的舊預約 (沒有 uid) 則需班級與老師都相符
+                    const canCancel = (data) => isAdmin
+                        || (data.uid ? data.uid === currentUser.uid
+                            : data.class === className && data.teacher === teacherName);
+                    let lastSeen = null; // 最後一次確認要刪除的預約內容
                     reservationSlotRef.transaction((currentData) => {
-                        if (currentData !== null && currentData.class === className && currentData.teacher === teacherName) {
+                        if (currentData !== null && canCancel(currentData)) {
+                            lastSeen = currentData;
                             return null; // 移除該預約紀錄
                         }
-                        return; // 找不到或資訊不符，中止交易
+                        return; // 找不到或沒有權限，中止交易
                     }, (error, committed, snapshot) => {
                         done();
                         const current = snapshot && snapshot.val();
@@ -684,14 +779,22 @@
                             showToast(`取消失敗：${error.message}`, true);
                             writeLogEntry('取消失敗', `系統錯誤：${error.message}`, logDetails);
                         } else if (committed) {
-                            showToast(`取消成功：${className} 已取消 ${labName} 的預約。`);
-                            writeLogEntry('取消成功', `${className} 成功取消預約`, logDetails);
+                            // 紀錄實際被取消的預約內容 (管理員可能取消別班的預約)
+                            const removed = lastSeen;
+                            const removedClass = removed ? removed.class : className;
+                            showToast(`取消成功：已取消 ${removedClass} 在 ${labName} 的預約。`);
+                            writeLogEntry('取消成功', `${removedClass} 成功取消預約`, {
+                                ...logDetails,
+                                class: removedClass,
+                                teacher: removed ? removed.teacher : teacherName
+                            });
                         } else if (!current) {
                             showToast('取消失敗：找不到該預約紀錄。', true);
                             writeLogEntry('取消失敗', '找不到該預約紀錄', logDetails);
                         } else {
-                            showToast('取消失敗：預約資訊不符，無法取消。', true);
-                            writeLogEntry('取消失敗', '預約資訊不符，無法取消', {
+                            const reason = current.uid ? '只有預約者本人可以取消這筆預約' : '預約資訊不符，無法取消';
+                            showToast(`取消失敗：${reason}。`, true);
+                            writeLogEntry('取消失敗', reason, {
                                 ...logDetails,
                                 actualBookedBy: current.class, // 記錄實際預約者
                                 actualTeacher: current.teacher // 記錄實際預約老師
@@ -704,8 +807,8 @@
             // --- 初始化與事件綁定 ---
             
             // 1. 立即產生下拉選單、日期、和頁籤
-            populateClasses();
-            populateTeachers();
+            CLASSES = defaultClasses();
+            populateSelects();
             dateInput.value = formatDate(new Date());
             renderTabs();
             
@@ -717,6 +820,203 @@
             bookBtn.addEventListener('click', () => handleReservation(true));
             cancelBtn.addEventListener('click', () => handleReservation(false));
             dateInput.addEventListener('change', renderCalendar);
+
+            // 4. 班級、教師、實驗室設定 (存在資料庫 config 節點，管理員可修改)
+            //    config = { classes: [...], teachers: [...], labs: { '實驗室名稱': 排序 } }
+            const configRef = database.ref('config');
+
+            function applyConfig(config) {
+                if (config) {
+                    if (Array.isArray(config.classes) && config.classes.length) CLASSES = config.classes.filter(Boolean);
+                    if (Array.isArray(config.teachers) && config.teachers.length) TEACHERS = config.teachers.filter(Boolean);
+                    if (config.labs && Object.keys(config.labs).length) {
+                        LABS = Object.keys(config.labs).sort((a, b) => config.labs[a] - config.labs[b]);
+                    }
+                }
+                if (!LABS.includes(currentLab)) currentLab = LABS[0];
+                populateSelects();
+                refreshFullLogLabOptions();
+                renderTabs();
+                renderCalendar();
+            }
+
+            function configPayload(classes, teachers, labs) {
+                const labMap = {};
+                labs.forEach((lab, index) => labMap[lab] = index + 1);
+                return { classes: classes, teachers: teachers, labs: labMap };
+            }
+
+            configRef.on('value', (snapshot) => applyConfig(snapshot.val()));
+
+            // --- 管理設定視窗 ---
+            const adminModal = document.getElementById('admin-modal');
+            const adminStatus = document.getElementById('admin-status');
+            const ADMIN_LIST_RULES = {
+                classes: { label: '班級', maxLength: 20 },
+                teachers: { label: '教師', maxLength: 10 },
+                labs: { label: '實驗室', maxLength: 20 }
+            };
+            let adminDraft = null;
+
+            function isAdmin() {
+                return !!currentUser && ADMIN_EMAILS.includes(currentUser.email);
+            }
+
+            function renderAdminList(name) {
+                const section = adminModal.querySelector(`[data-list="${name}"]`);
+                const container = section.querySelector('[data-items]');
+                container.innerHTML = '';
+                adminDraft[name].forEach((item, index) => {
+                    const chip = document.createElement('span');
+                    chip.className = 'inline-flex items-center gap-1 pl-2.5 pr-1 py-1 bg-gray-100 border border-gray-200 rounded-full text-sm text-gray-700';
+                    chip.textContent = item;
+                    const remove = document.createElement('button');
+                    remove.type = 'button';
+                    remove.className = 'w-5 h-5 rounded-full text-gray-400 hover:bg-red-100 hover:text-red-600 leading-none';
+                    remove.textContent = '×';
+                    remove.title = `移除 ${item}`;
+                    remove.addEventListener('click', () => {
+                        if (name === 'labs' && adminDraft.labs.length === 1) {
+                            showToast('至少要保留一間實驗室。', true);
+                            return;
+                        }
+                        adminDraft[name].splice(index, 1);
+                        renderAdminList(name);
+                    });
+                    chip.appendChild(remove);
+                    container.appendChild(chip);
+                });
+                section.querySelector('[data-count]').textContent = `(${adminDraft[name].length})`;
+            }
+
+            function addAdminItem(name) {
+                const input = adminModal.querySelector(`[data-list="${name}"] [data-input]`);
+                const value = input.value.trim();
+                const rule = ADMIN_LIST_RULES[name];
+                if (!value) return;
+                if (value.length > rule.maxLength) {
+                    showToast(`${rule.label}名稱最多 ${rule.maxLength} 個字。`, true);
+                    return;
+                }
+                if (name === 'labs' && /[.#$\[\]\/]/.test(value)) {
+                    showToast('實驗室名稱不能包含 . # $ [ ] / 這些符號。', true);
+                    return;
+                }
+                if (adminDraft[name].includes(value)) {
+                    showToast(`「${value}」已經在清單中。`, true);
+                    return;
+                }
+                adminDraft[name].push(value);
+                input.value = '';
+                input.focus();
+                renderAdminList(name);
+            }
+
+            function openAdmin() {
+                if (!isAdmin()) return;
+                adminDraft = { classes: CLASSES.slice(), teachers: TEACHERS.slice(), labs: LABS.slice() };
+                Object.keys(ADMIN_LIST_RULES).forEach(renderAdminList);
+                adminStatus.textContent = '';
+                adminModal.classList.remove('hidden');
+                document.body.style.overflow = 'hidden';
+            }
+
+            function closeAdmin() {
+                adminModal.classList.add('hidden');
+                document.body.style.overflow = '';
+            }
+
+            Object.keys(ADMIN_LIST_RULES).forEach(name => {
+                const section = adminModal.querySelector(`[data-list="${name}"]`);
+                section.querySelector('[data-add]').addEventListener('click', () => addAdminItem(name));
+                section.querySelector('[data-input]').addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') { e.preventDefault(); addAdminItem(name); }
+                });
+            });
+
+            document.getElementById('admin-btn').addEventListener('click', openAdmin);
+            document.getElementById('admin-close').addEventListener('click', closeAdmin);
+            document.getElementById('admin-cancel').addEventListener('click', closeAdmin);
+            adminModal.addEventListener('click', (e) => { if (e.target === adminModal) closeAdmin(); });
+            document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !adminModal.classList.contains('hidden')) closeAdmin(); });
+
+            document.getElementById('admin-save').addEventListener('click', () => {
+                if (!isAdmin()) return;
+                const saveBtn = document.getElementById('admin-save');
+                saveBtn.disabled = true;
+                adminStatus.textContent = '儲存中...';
+                configRef.set(configPayload(adminDraft.classes, adminDraft.teachers, adminDraft.labs)).then(() => {
+                    writeLogEntry('設定變更', '管理員更新了班級、教師、實驗室清單', {
+                        classCount: adminDraft.classes.length,
+                        teacherCount: adminDraft.teachers.length,
+                        labs: adminDraft.labs.join('、')
+                    });
+                    showToast('設定已儲存，所有老師的選項已更新。');
+                    closeAdmin();
+                }).catch((error) => {
+                    adminStatus.textContent = '';
+                    showToast(`儲存失敗：${error.message}`, true);
+                }).finally(() => { saveBtn.disabled = false; });
+            });
+
+            // 5. Google 登入
+            const authSignedOut = document.getElementById('auth-signed-out');
+            const authSignedIn = document.getElementById('auth-signed-in');
+            const authUserLabel = document.getElementById('auth-user');
+            const fullLogBtnWrap = document.getElementById('full-log-btn-wrap');
+
+            function isAllowedEmail(email) {
+                return String(email || '').toLowerCase().endsWith('@' + ALLOWED_EMAIL_DOMAIN);
+            }
+
+            document.getElementById('sign-in-btn').addEventListener('click', () => {
+                const provider = new firebase.auth.GoogleAuthProvider();
+                // hd 讓 Google 優先顯示學校帳號；真正的限制在下方檢查與資料庫安全規則
+                provider.setCustomParameters({ hd: ALLOWED_EMAIL_DOMAIN, prompt: 'select_account' });
+                // 使用彈出視窗登入 (跳轉登入在擋第三方 Cookie 的瀏覽器中會失敗，所以不使用)
+                auth.signInWithPopup(provider).catch((error) => {
+                    if (error.code === 'auth/popup-blocked') {
+                        showToast('登入視窗被瀏覽器擋住了，請允許此網站開啟彈出式視窗後再試一次。', true);
+                    } else if (error.code !== 'auth/popup-closed-by-user' && error.code !== 'auth/cancelled-popup-request') {
+                        showToast(`登入失敗：${error.message}`, true);
+                    }
+                });
+            });
+
+            document.getElementById('sign-out-btn').addEventListener('click', () => auth.signOut());
+
+            auth.onAuthStateChanged((user) => {
+                if (user && !isAllowedEmail(user.email)) {
+                    showToast(`請使用 @${ALLOWED_EMAIL_DOMAIN} 的學校帳號登入。`, true);
+                    auth.signOut();
+                    return;
+                }
+                currentUser = user;
+                authSignedOut.classList.toggle('hidden', !!user);
+                authSignedIn.classList.toggle('hidden', !user);
+                fullLogBtnWrap.classList.toggle('hidden', !user);
+                document.getElementById('admin-btn').classList.toggle('hidden', !isAdmin());
+                if (!isAdmin()) closeAdmin();
+                // 資料庫還沒有設定時，管理員登入後自動寫入目前的預設清單
+                if (isAdmin()) {
+                    configRef.once('value').then((snapshot) => {
+                        if (!snapshot.exists()) return configRef.set(configPayload(CLASSES, TEACHERS, LABS));
+                    }).catch((error) => console.error('初始化設定失敗:', error));
+                }
+                bookBtn.disabled = cancelBtn.disabled = !user;
+                bookBtn.classList.toggle('opacity-50', !user);
+                cancelBtn.classList.toggle('opacity-50', !user);
+                recentLogsQuery.off('value', onRecentLogs);
+                if (user) {
+                    authUserLabel.textContent = user.displayName ? `${user.displayName} (${user.email})` : user.email;
+                    logDisplay.innerHTML = '載入中...';
+                    recentLogsQuery.on('value', onRecentLogs, onRecentLogsError);
+                } else {
+                    authUserLabel.textContent = '';
+                    closeFullLog();
+                    logDisplay.innerHTML = '<p class="text-gray-500">登入後才能查看操作紀錄。</p>';
+                }
+            });
         });
     </script>
 
